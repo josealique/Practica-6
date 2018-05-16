@@ -1,54 +1,116 @@
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.io.*;
+import java.util.*;
 
 public class LZW {
-
-    public static void main(String[] args) throws Exception {
-        InputStream is = new ByteArrayInputStream("aa".getBytes());
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        LZW.compress(is, baos);
-    }
-
     public static void compress(InputStream is, OutputStream os) throws Exception {
-        ArrayList<Byte> lista = insertarBytes(is.readAllBytes());
-        Map<String, Integer> map = new HashMap<>();
-        String string = "";
-        String lapalabra = "";
+        List<Caja> lista = new ArrayList<>();
+        Map<String,Caja> map = new HashMap<>();
+        char guardar;
+        String obtenerValores = "", comparar = "";
         int index = 0;
-        for (int i = 0; i < lista.size(); i++) {
-            char c = (char) (lista.get(i) & 0xFF);
-            string = lapalabra + c;
-            lapalabra = lapalabra + c;
-            if (!map.containsKey(string)){
-                map.put(string, index);
-                os.write(index);
-                os.write(string.charAt(string.length()-1));
-                index = map.containsKey(lapalabra) ? index : ++index;
-                lapalabra = "";
-            } else if (map.containsKey(string)){
-                map.put(string, index);
-                index++;
+        int contador = 0;
+        byte[] bytes = is.readAllBytes();
+        for (int i = 0; i < bytes.length; i++) {
+            guardar = (char) (bytes[i] & 0xFF);
+            comparar = obtenerValores + guardar;
+            if (contador >= 256){
+                map.clear();
+                contador = 0;
             }
-        } if (map.containsKey(string)){
-
+            if (!map.containsKey(comparar) || i == bytes.length -1){
+                int guardarIndice;
+                if (map.containsKey(obtenerValores)){
+                    guardarIndice = map.get(obtenerValores).getTemporalIndex();
+                } else {
+                    guardarIndice = index;
+                }
+                Caja caja = new Caja((byte) (comparar.charAt(comparar.length()-1)), ++index, guardarIndice);
+                if (comparar(lista, caja) && i + 1 < bytes.length || map.containsKey(obtenerValores)){
+                    lista.add(caja);
+                } else {
+                    lista.add(new Caja((byte) (comparar.charAt(comparar.length()-1)), guardarIndice, 0));
+                }
+                map.put(comparar, caja);
+                obtenerValores = "";
+                contador++;
+                continue;
+            }
+            obtenerValores = obtenerValores + guardar;
         }
-        System.out.println(map);
+        for (Caja caja : lista) {
+            os.write(caja.getIndex());
+            os.write(caja.getCaracter());
+        }
+        os.close();
     }
 
-    private static ArrayList<Byte> insertarBytes(byte[] is) {
-        ArrayList<Byte> bytes = new ArrayList<>();
-        for (int i = 0; i < is.length; i++) {
-            bytes.add(is[i]);
+    private static boolean comparar(List<Caja> cajas, Caja caja){
+        for (Caja c : cajas) {
+            if (c.equals(caja)) return true;
         }
-        return bytes;
+        return false;
     }
 
     public static void decompress(InputStream is, OutputStream os) throws Exception {
+        List<Caja> cajaArrayList = list(is);
 
+    }
+
+    // Método que creará una lista con todos los tokens creados
+    private static List<Caja> list(InputStream is) throws IOException {
+        // Creamos la lista de cajas que será la que contendrá los tokens, y creamos las variables
+        List<Caja> cajas = new ArrayList<>();
+        int index = 0;
+        char simbolo;
+        // Recorremos el InputStream
+        while (is.available() > 0){
+            index = is.read();
+            // Casteamos a char el simbolo y hacemos que no coja valores negativos
+            simbolo = (char) (is.read() & 0xFF);
+            // Creamos una nueva Caja con los valores
+            Caja c = new Caja((byte)simbolo, index, index);
+            // Añadimos a la lista la nueva caja
+            cajas.add(c);
+        }
+        return cajas;
+    }
+}
+
+class Caja{
+    private Integer index;
+    private Byte caracter;
+    private Integer temporalIndex;
+
+    Caja(Byte caracter, Integer temporalIndex, Integer index){
+        this.index = index;
+        this.caracter = caracter;
+        this.temporalIndex = temporalIndex;
+    }
+
+    public Integer getIndex() {
+        return index;
+    }
+
+
+    public Byte getCaracter() {
+        return caracter;
+    }
+
+    public Integer getTemporalIndex() {
+        return temporalIndex;
+    }
+
+    @Override
+    public String toString() {
+        return "Valor: " + this.caracter + " Index: " + this.temporalIndex + "\n";
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof Caja){
+            Caja c = (Caja) obj;
+            return this.caracter == c.caracter && this.index == c.index;
+        }
+        return false;
     }
 }
